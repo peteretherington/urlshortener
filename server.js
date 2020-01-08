@@ -9,13 +9,13 @@ const cors = require('cors');
 const app = express();
 
 /** this project needs a db !! **/
-
-// mongoose.connect(process.env.MONGOLAB_URI);
+mongoose.connect(process.env.MONGOLAB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
 app.use(cors());
 
 /** this project needs to parse POST bodies **/
 // you should mount the body-parser here
+// const bodyParser = require('body-parser');
 
 app.use('/public', express.static(process.cwd() + '/public'));
 
@@ -26,8 +26,9 @@ app.get('/', function(req, res) {
 const shortenURL = url => ({ url });
 
 // Shorten URL API endpoint
-app.get('/api/shorturl/:url', function(req, res) {
+app.get('/api/shorturl/:url?', function(req, res) {
 	res.json(shortenURL(req.params.url));
+	// res.json(shortenURL(req.params.url));
 
 	// Example response
 	// {"original_url":"www.google.com","short_url":1}
