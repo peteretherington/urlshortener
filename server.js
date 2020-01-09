@@ -32,6 +32,29 @@ app.get('/', function(req, res) {
 	res.sendFile(process.cwd() + '/views/index.html');
 });
 
+const createShortURL = () => {
+	const length = 8;
+	const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+	let i = 0;
+	let short;
+
+	while (i < length) {
+		const even = i % 2 === 0;
+		let char;
+
+		if (even) {
+			char = alphabet[Math.floor(Math.random() * 26)];
+		} else {
+			char = Math.floor(Math.random() * 10);
+		}
+
+		short = i === 0 ? char : `${short}${char}`;
+		i++;
+	}
+
+	return short;
+};
+
 const URLSchema = new mongoose.Schema({
 	original_url: String,
 	short_url: String
@@ -39,44 +62,41 @@ const URLSchema = new mongoose.Schema({
 
 const URL = mongoose.model('URL', URLSchema);
 
-const createAndSaveURL = (url, done) => {
-	const item = new URL({
-		original_url: url,
-		short_url: String(Math.floor(Math.random() * 100))
-	});
-
-	item.save((err, data) => (err ? console.error(err) : done(null, data)));
+const createAndSaveURL = (original_url, short_url) => {
+	const item = new URL({ original_url, short_url });
+	item.save();
 };
 
-const shortenURL = (req, res, done) => {
+const shortenURL = (req, res) => {
 	const httpRegex = /http[s]*:\/\/[www.]*/;
-	const { url } = req.body;
-	const dnsURL = url.replace(httpRegex, '');
+	const original_url = req.body.url;
+	const dnsURL = original_url.replace(httpRegex, '');
 
 	// Test if URL is valid
 	dns.lookup(dnsURL, err => {
 		if (err) return res.json({ error: 'Invalid URL' });
 
-		createAndSaveURL(url, done);
+		const short_url = createShortURL();
+		createAndSaveURL(original_url, short_url);
 
-		res.json({
-			original_url: url,
-			short_url: 'unkown'
-		});
+		res.json({ original_url, short_url });
 	});
 };
 
 // Shorten URL API endpoint
 app.post('/api/shorturl/new', shortenURL);
 
+const findURLByShort = async short_url => await URL.findOne({ short_url });
+
+const redirectShortURL = async (req, res) => {
+	const { short_url } = req.params;
+	const { original_url } = await findURLByShort(short_url);
+	res.redirect(original_url);
+};
+
+// Redirect Short URL API endpoint
+app.get('/api/shorturl/:short_url', redirectShortURL);
+
 app.listen(process.env.PORT, function() {
 	console.log(`Node listening on ${process.env.PORT}`);
 });
-
-/*
-1. I can POST a URL to [project_url]/api/shorturl/new and I will receive a shortened URL in the JSON response. Example : {"original_url":"www.google.com","short_url":1}
-
-2. If I pass an invalid URL that doesn't follow the http(s)://www.example.com(/more/routes) format, the JSON response will contain an error like {"error":"invalid URL"}
-
-HINT: to be sure that the submitted url points to a valid site you can use the function dns.lookup(host, cb) from the dns core module. When I visit the shortened URL, it will redirect me to my original link. 
-*/
